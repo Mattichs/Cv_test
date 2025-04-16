@@ -136,19 +136,22 @@ int main( int argc, char* argv[] ) {
                             good_matches.push_back(knn_matches[i][0]);
                         }
                     }
-                    vector<Point> bb_detected; 
-                    bb_detected.push_back(Point(x, y));
-                    bb_detected.push_back(Point(x+ window.first, y+ window.second));
-                    float conf = iou(bb_truth, bb_detected);
-                    
-                    if(conf > 0.8) {
-                        cout << "Confidence: " << conf << endl;
-                        rectangle(outputImage, roi, Scalar(0, 255, 0), 2);
-                        //imshow("output", cropImg);
-                        //waitKey(0);
-                        // break if you want only one detection per window
-                        break;
+                    if(good_matches.size() > 5) {
+                        vector<Point> bb_detected; 
+                        bb_detected.push_back(Point(x, y));
+                        bb_detected.push_back(Point(x+ window.first, y+ window.second));
+                        float conf = iou(bb_truth, bb_detected);
+                        
+                        if(conf > 0.8) {
+                            cout << "Confidence: " << conf << endl;
+                            rectangle(outputImage, roi, Scalar(0, 255, 0), 2);
+                            //imshow("output", cropImg);
+                            //waitKey(0);
+                            // break if you want only one detection per window
+                            break;
+                        }
                     }
+                    
                     
                 }
             }
