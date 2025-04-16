@@ -64,8 +64,7 @@ struct ViewData {
 
 int main( int argc, char* argv[] ) {
     
-    Mat img1 = imread(  "drill.png", IMREAD_GRAYSCALE );
-    Mat testImg = imread(  "test.jpg", IMREAD_GRAYSCALE );
+    Mat testImg = imread(  "testFiles/test.jpg", IMREAD_GRAYSCALE );
     if ( testImg.empty() ){
         cout << "Could not open or find the image!\n" << endl;
         return -1;
@@ -100,7 +99,7 @@ int main( int argc, char* argv[] ) {
 
     // read ground truth
     // collect ground truth
-    ifstream ReadFile("test.txt");
+    ifstream ReadFile("testFiles/test.txt");
     string text;
     getline(ReadFile, text);
     vector<string> words = split(text);
