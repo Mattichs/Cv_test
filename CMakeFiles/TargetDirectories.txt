@@ -1,0 +1,3 @@
+/home/cognoxd/CV/project/Cv_test/CMakeFiles/sift.dir
+/home/cognoxd/CV/project/Cv_test/CMakeFiles/edit_cache.dir
+/home/cognoxd/CV/project/Cv_test/CMakeFiles/rebuild_cache.dir
