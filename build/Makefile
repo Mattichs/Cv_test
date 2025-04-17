@@ -117,41 +117,41 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named sift
+# Target rules for targets named labelFinder
 
 # Build rule for target.
-sift: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 sift
-.PHONY : sift
+labelFinder: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 labelFinder
+.PHONY : labelFinder
 
 # fast build rule for target.
-sift/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/build
-.PHONY : sift/fast
+labelFinder/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/build
+.PHONY : labelFinder/fast
 
-src/sift.o: src/sift.cpp.o
-.PHONY : src/sift.o
+src/labelFinder.o: src/labelFinder.cpp.o
+.PHONY : src/labelFinder.o
 
 # target to build an object file
-src/sift.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/src/sift.cpp.o
-.PHONY : src/sift.cpp.o
+src/labelFinder.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/src/labelFinder.cpp.o
+.PHONY : src/labelFinder.cpp.o
 
-src/sift.i: src/sift.cpp.i
-.PHONY : src/sift.i
+src/labelFinder.i: src/labelFinder.cpp.i
+.PHONY : src/labelFinder.i
 
 # target to preprocess a source file
-src/sift.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/src/sift.cpp.i
-.PHONY : src/sift.cpp.i
+src/labelFinder.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/src/labelFinder.cpp.i
+.PHONY : src/labelFinder.cpp.i
 
-src/sift.s: src/sift.cpp.s
-.PHONY : src/sift.s
+src/labelFinder.s: src/labelFinder.cpp.s
+.PHONY : src/labelFinder.s
 
 # target to generate assembly for a file
-src/sift.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/src/sift.cpp.s
-.PHONY : src/sift.cpp.s
+src/labelFinder.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/src/labelFinder.cpp.s
+.PHONY : src/labelFinder.cpp.s
 
 # Help Target
 help:
@@ -161,10 +161,10 @@ help:
 	@echo "... depend"
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
-	@echo "... sift"
-	@echo "... src/sift.o"
-	@echo "... src/sift.i"
-	@echo "... src/sift.s"
+	@echo "... labelFinder"
+	@echo "... src/labelFinder.o"
+	@echo "... src/labelFinder.i"
+	@echo "... src/labelFinder.s"
 .PHONY : help
 
 

@@ -63,7 +63,7 @@ CMAKE_BINARY_DIR = /home/cognoxd/CV/project/Cv_test/build
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/sift.dir/all
+all: CMakeFiles/labelFinder.dir/all
 .PHONY : all
 
 # The main recursive "preinstall" target.
@@ -71,34 +71,34 @@ preinstall:
 .PHONY : preinstall
 
 # The main recursive "clean" target.
-clean: CMakeFiles/sift.dir/clean
+clean: CMakeFiles/labelFinder.dir/clean
 .PHONY : clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/sift.dir
+# Target rules for target CMakeFiles/labelFinder.dir
 
 # All Build rule for target.
-CMakeFiles/sift.dir/all:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/cognoxd/CV/project/Cv_test/build/CMakeFiles --progress-num=1,2 "Built target sift"
-.PHONY : CMakeFiles/sift.dir/all
+CMakeFiles/labelFinder.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/cognoxd/CV/project/Cv_test/build/CMakeFiles --progress-num=1,2 "Built target labelFinder"
+.PHONY : CMakeFiles/labelFinder.dir/all
 
 # Build rule for subdir invocation for target.
-CMakeFiles/sift.dir/rule: cmake_check_build_system
+CMakeFiles/labelFinder.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/cognoxd/CV/project/Cv_test/build/CMakeFiles 2
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/sift.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/labelFinder.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/cognoxd/CV/project/Cv_test/build/CMakeFiles 0
-.PHONY : CMakeFiles/sift.dir/rule
+.PHONY : CMakeFiles/labelFinder.dir/rule
 
 # Convenience name for target.
-sift: CMakeFiles/sift.dir/rule
-.PHONY : sift
+labelFinder: CMakeFiles/labelFinder.dir/rule
+.PHONY : labelFinder
 
 # clean rule for target.
-CMakeFiles/sift.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/sift.dir/build.make CMakeFiles/sift.dir/clean
-.PHONY : CMakeFiles/sift.dir/clean
+CMakeFiles/labelFinder.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/labelFinder.dir/build.make CMakeFiles/labelFinder.dir/clean
+.PHONY : CMakeFiles/labelFinder.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.
