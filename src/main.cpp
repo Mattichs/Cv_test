@@ -1,218 +1,203 @@
-#include <opencv2/highgui.hpp>
-#include "opencv2/imgproc.hpp"
-#include <iostream>
-#include <opencv2/objdetect.hpp>
-#include "opencv2/imgproc.hpp"
-#include <filesystem>
-#include <string>
+#include <opencv2/opencv.hpp>
+#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/ml.hpp>
+#include <filesystem>
+#include <iostream>
+#include <numeric>
 
-
-/*  
-Allora vorrei tenere il codice come è ora, addestrerò un classificatore per oggetto o posso addestrare adaboost per rilevare sfondo, 1,2,3 (dove i numeri sono nomi degli oggetti), in caso vorrei tenere conto di tutti i rettangoli che rilevano un oggetto. Per poi mantenerne solo uno, quindi penso usare NMS.
-*/
-
+namespace fs = std::filesystem;
 using namespace cv;
+using namespace cv::ml;
+using namespace cv::xfeatures2d;
 using namespace std;
 
-float computeIoU(const Rect& a, const Rect& b) {
-    int intersectionArea = (a & b).area();
-    int unionArea = a.area() + b.area() - intersectionArea;
-    if (unionArea == 0) return 0.0;
-    return (float)intersectionArea / unionArea;
+const int VOCAB_SIZE = 100;
+const int WIN_HEIGHT= 256;
+const int WIN_WIDTH = 128;
+const int STEP_SIZE = 32;
+
+struct Detection {
+    Rect roi;
+    float prob;
+};
+
+
+Detection getDetectionWithMaxOverlap(const vector<Detection>& detections, float iouThreshold) {
+    if (detections.empty()) {
+        throw std::invalid_argument("No detections to process");
+    }
+
+    int maxOverlapCount = 0;    // Numero di sovrapposizioni più alto trovato
+    Detection bestDetection;    // La detection con il massimo numero di sovrapposizioni
+
+    for (size_t i = 0; i < detections.size(); ++i) {
+        const Detection& current = detections[i];
+        int overlapCount = 0;
+
+        // Controlla quante altre detections si sovrappongono con questa
+        for (size_t j = 0; j < detections.size(); ++j) {
+            if (i == j) continue;  // Non confrontare la detection con sé stessa
+
+            const Detection& other = detections[j];
+            float iou = (current.roi & other.roi).area() /
+                        float((current.roi | other.roi).area());
+
+            if (iou > iouThreshold) {
+                overlapCount++;
+            }
+        }
+
+        // Se questa detection ha più sovrapposizioni di altre, aggiornala come la migliore
+        if (overlapCount > maxOverlapCount) {
+            maxOverlapCount = overlapCount;
+            bestDetection = current;
+        }
+    }
+
+    return bestDetection;
+}
+// === Estrai SIFT dove la maschera è positiva ===
+Mat extractSIFT(const Mat& imgGray, const Mat& mask) {
+    Ptr<SIFT> sift = SIFT::create();
+    vector<KeyPoint> keypoints;
+    Mat descriptors;
+    sift->detectAndCompute(imgGray, mask, keypoints, descriptors);
+    return descriptors;
 }
 
+// === Istogramma BoVW ===
+Mat computeHistogram(const Mat& descriptors, const Mat& vocabulary) {
+    Mat hist = Mat::zeros(1, vocabulary.rows, CV_32F);
+    if (descriptors.empty()) return hist;
+
+    for (int i = 0; i < descriptors.rows; ++i) {
+        double minDist = DBL_MAX;
+        int bestIdx = 0;
+        for (int j = 0; j < vocabulary.rows; ++j) {
+            double dist = norm(descriptors.row(i), vocabulary.row(j));
+            if (dist < minDist) {
+                minDist = dist;
+                bestIdx = j;
+            }
+        }
+        hist.at<float>(0, bestIdx) += 1.0f;
+    }
+
+    return hist;
+}
+
+// === Sliding Window Detection ===
+vector<Detection> slidingWindow(const Mat& img, Ptr<SVM> svm, const Mat& vocab, float threshold = 0.7) {
+    vector<Detection> detections;
+    Ptr<SIFT> sift = SIFT::create();
+
+    for (int y = 0; y <= img.rows - WIN_HEIGHT; y += STEP_SIZE) {
+        for (int x = 0; x <= img.cols - WIN_WIDTH; x += STEP_SIZE) {
+            Rect roi(x, y, WIN_WIDTH, WIN_HEIGHT);
+            Mat patchGray;
+            cvtColor(img(roi), patchGray, COLOR_BGR2GRAY);
+
+            vector<KeyPoint> kp;
+            Mat desc;
+            sift->detectAndCompute(patchGray, noArray(), kp, desc);
+
+            if (desc.empty()) continue;
+
+            Mat hist = computeHistogram(desc, vocab);
+            float response = svm->predict(hist, noArray(), StatModel::RAW_OUTPUT);
+            float prob = 1.0f / (1.0f + exp(-response));
+
+            if (prob > threshold) {
+                Detection temp;
+                temp.roi = roi;
+                temp.prob = prob;
+                detections.push_back(temp);
+            }
+                
+        }
+    }
+    return detections;
+}
 
 int main() {
-    //Mat img  = imread("drill.png");
-    
-    // lettura positives
-    vector<Mat> posImg;
-    Mat img;
-    int target_width = 128;
-    int target_height = 128;
+    string dataset_path = "models/";
 
-    // leggo data positivi (dove c'è effettivamente l'oggetto)
-    std::string posPath = "positives";
-    for (const auto & entry : filesystem::directory_iterator(posPath)) {
-        img = imread(entry.path().string());
-        resize(img, img, Size(target_width, target_height)); // resize 128x128 (HOG standard)
-        cvtColor(img, img, COLOR_BGR2GRAY);
-        posImg.push_back(img);
+    vector<Mat> allDescriptors;
+    vector<int> labels;
+
+    for (const auto& entry : fs::directory_iterator(dataset_path)) {
+        string filename = entry.path().filename().string();
+
+        // qui potrei estrarre lo sofndo dai bg ma overfitta per riconoscere solo il background
+        if (filename.find("_color.png") == string::npos) continue;
+
+        string base = filename.substr(0, filename.find("_color.png"));
+        string colorPath = dataset_path + base + "_color.png";
+        string maskPath = dataset_path + base + "_mask.png";
+
+        Mat color = imread(colorPath);
+        Mat mask = imread(maskPath, IMREAD_GRAYSCALE);
+        Mat gray;
+        cvtColor(color, gray, COLOR_BGR2GRAY);
+
+        Mat desc = extractSIFT(gray, mask);
+        if (!desc.empty()) {
+            allDescriptors.push_back(desc);
+            labels.push_back(1);  // positivo
+        }
+
+        Mat desc_bg = extractSIFT(gray, Mat()); // maschera nulla = sfondo
+        if (!desc_bg.empty()) {
+            allDescriptors.push_back(desc_bg);
+            labels.push_back(0);  // negativo
+        }
     }
 
-    // leggo dati negativi (dove non c'è l'oggetto)
-    vector<Mat> negImg;
-    std::string negPath = "negatives";
-    for (const auto & entry : filesystem::directory_iterator(negPath)) {
-        img = imread(entry.path().string());
-        if(img.empty()) {
-            cerr << "Non riesco a leggere il file: " << entry.path() << endl;
+    // Unisci tutti i descrittori
+    Mat descriptorsAll;
+    vconcat(allDescriptors, descriptorsAll);
+
+    // KMeans
+    cout << "KMeans clustering...\n";
+    Mat labelsK;
+    TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
+    BOWKMeansTrainer bowTrainer(VOCAB_SIZE, criteria, 3, KMEANS_PP_CENTERS);
+    Mat vocabulary = bowTrainer.cluster(descriptorsAll);
+
+    // Istogrammi
+    Mat trainData;
+    for (const auto& desc : allDescriptors) {
+        Mat hist = computeHistogram(desc, vocabulary);
+        trainData.push_back(hist);
+    }
+
+    // SVM
+    Ptr<SVM> svm = SVM::create();
+    svm->setKernel(SVM::LINEAR);
+    svm->setType(SVM::C_SVC);
+    svm->train(trainData, ROW_SAMPLE, labels);
+    svm->save("svm_model.yml");
+    FileStorage fs_vocab("vocab.yml", FileStorage::WRITE);
+    fs_vocab << "vocabulary" << vocabulary;
+    fs_vocab.release();
+    cout << "SVM addestrato!\n";
+
+    // Test sulle immagini di test
+    for (const auto& entry : fs::directory_iterator("testFiles/")) {
+        Mat testImg = imread(entry.path().string());
+        vector<Detection> detections = slidingWindow(testImg, svm, vocabulary);
+        cout << detections.size() << endl;
+        if(detections.size() == 0) {
+            cout << "No detections sorry :(" << endl;
             continue;
         }
-        resize(img, img, Size(target_width, target_height)); // resize 128x128 (HOG standard)
-        cvtColor(img, img, COLOR_BGR2GRAY);
-        negImg.push_back(img);
+        float iouThreshold = 0.3f;  // Soglia per determinare se due box sono considerate sovrapposte
+        Detection bestDetection = getDetectionWithMaxOverlap(detections, iouThreshold);
+
+        rectangle(testImg, bestDetection.roi, Scalar(0, 255, 0), 2);
+
+        imshow("Detections", testImg);
+        waitKey(0);
     }
-    
-
-    // HOG feature extraction
-    HOGDescriptor hog;
-    vector<float> descriptors;
-
-    Mat x; // matrice delle features, ogni riga corrisponde ad una immagine
-
-    // positive Y = 1
-    Mat y = Mat::ones(posImg.size(), 1, CV_32S); // matrice delle label, per le positive una per riga valore 1 ovvero c'è un oggetto
-
-    // negative Y = 0
-    Mat y_neg = Mat::zeros(negImg.size(), 1, CV_32S);
-    
-    vconcat(y, y_neg, y); // creo unica matrice y (ora ha sia 0 che 1)
-    
-    // positive data
-    for(int i = 0; i < posImg.size(); i++) {
-        hog.compute(posImg[i], descriptors, Size(8,8), Size(0,0));
-        Mat descMat(descriptors);
-        Mat descRow = descMat.t();
-        x.push_back(descRow);
-    }
-    // neagtive data 
-    for(int i = 0; i < negImg.size(); i++) {
-        hog.compute(negImg[i], descriptors, Size(8,8), Size(0,0));
-        Mat descMat(descriptors);
-        Mat descRow = descMat.t();
-        x.push_back(descRow);
-    }
-    x.convertTo(x, CV_32F);
-
-
-    cout << "X size: " << x.rows << " x " << x.cols << endl;
-    cout << "y size: " << y.rows << " x " << y.cols << endl;
-
-    
-    // train ADABOOST
-    Ptr<ml::Boost> boost = ml::Boost::create();
-
-    boost->setBoostType(ml::Boost::REAL);
-    boost->setWeakCount(300);
-    boost->setWeightTrimRate(0.95);
-    boost->setMaxDepth(5);
-    boost->setUseSurrogates(false);
-
-    Ptr<ml::TrainData> trainData = ml::TrainData::create(x, ml::ROW_SAMPLE, y);
-
-    cout << "start" << endl;
-    boost->train(trainData);
-    cout << "end" << endl;
-
-    boost->save("first_model.xml");
-
-
-    float scaleFactor = 0.9; // Quanto riduco l'immagine a ogni step (0.9 = -10%)
-    float maxScaleFactor = 1.0; // Scala iniziale 
-    float minScaleFactor = 0.5; // Scala minima (ad esempio, 0.8 = -50%)
-
-    int minSize = 128;       // non scendere sotto questa dimensione
-    int windowDim = 128;
-    int stride = 32;
-
-    Mat test;
-    string testPath = "testFiles/";
-    for (const auto & entry : filesystem::directory_iterator(testPath)) {
-        test = imread(entry.path().string());
-        
-        Mat original = test.clone(); // per lo scaling, ma forse posso toglierla
-
-        Mat display = original.clone(); // per visualizzare i risultati
-
-        vector<Rect> detectedBoxes;
-        vector<float> detectedProbs;
-
-        while (test.cols >= minSize && test.rows >= minSize && (float)test.cols / original.cols >= minScaleFactor) {
-            for (int y = 0; y <= test.rows - windowDim; y += stride) {
-                for (int x = 0; x <= test.cols - windowDim; x += stride) {
-                    Rect roi(x, y, windowDim, windowDim);
-                    Mat cropImg = test(roi).clone();  
-                    cvtColor(cropImg, cropImg, COLOR_BGR2GRAY);
-                    vector<float> tDescriptors;
-                    hog.compute(cropImg, tDescriptors, Size(8,8), Size(0,0));
-                    Mat descRow(tDescriptors);
-                    descRow = descRow.t();
-                    descRow.convertTo(descRow, CV_32F);
-                    
-                    //float response = boost->predict(descRow);
-                    float rawScore = boost->predict(descRow, noArray(), ml::StatModel::RAW_OUTPUT);
-                    
-                    // Calcola la probabilità
-                    float probability = 1.0 / (1.0 + exp(-rawScore));
-                    float backgroundProbability = 1.0 - probability;
-                    // Mostra i risultati
-                    if (probability > 0.5f) { // Soglia per considerare un oggetto rilevato
-                        float scale = (float)original.cols / test.cols;
-                        Rect scaledROI(x * scale, y * scale, windowDim * scale, windowDim * scale);
-                        imshow("Detections", cropImg);
-                        waitKey(0); 
-                        detectedBoxes.push_back(scaledROI);
-                        detectedProbs.push_back(probability);
-                    }
-                }
-            }
-            resize(test, test, Size(), scaleFactor, scaleFactor); // scala immagine
-        
-        }
-
-        float iouThreshold = 0.1;
-        vector<Rect> filteredBoxes;
-        vector<float> filteredProbs;
-
-        // scarto rilevazioni con bassa iou 
-        for (int i = 0; i < detectedBoxes.size(); i++) {
-            int countOverlap = 0;
-            for (int j = 0; j < detectedBoxes.size(); j++) {
-                if (i == j) continue;
-                if (computeIoU(detectedBoxes[i], detectedBoxes[j]) > iouThreshold) {
-                    countOverlap++;
-                }
-            }
-            if (countOverlap > 0) {
-                filteredBoxes.push_back(detectedBoxes[i]);
-                filteredProbs.push_back(detectedProbs[i]);
-            }
-        }
-
-
-        int bestIdx = -1;
-        float bestScore = -1;
-
-        // prendo il boxes migliore, ovvero quello con più intersezioni con gli altri
-        for (int i = 0; i < filteredBoxes.size(); i++) {
-            float sumIoU = 0;
-            for (int j = 0; j < filteredBoxes.size(); j++) {
-                if (i == j) continue;
-                sumIoU += computeIoU(filteredBoxes[i], filteredBoxes[j]);
-            }
-            if (sumIoU > bestScore) {
-                bestScore = sumIoU;
-                bestIdx = i;
-            }
-        }
-
-        
-        if (bestIdx >= 0) {
-            rectangle(display, filteredBoxes[bestIdx], Scalar(0, 0, 255), 3);
-            cout << "Rettangolo finale selezionato tra " << filteredBoxes.size() << " validi." << endl;
-            imshow("Best Detection", display);
-            waitKey(0);
-        } else {
-            cout << "Nessun rettangolo sufficientemente supportato da altri." << endl;
-        }
-    
-
-    }
-
-    
-
     return 0;
 }
-
