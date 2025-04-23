@@ -13,12 +13,13 @@ using namespace std;
 
 const int VOCAB_SIZE = 100;
 const int WIN_HEIGHT= 256;
-const int WIN_WIDTH = 128;
-const int STEP_SIZE = 32;
+const int WIN_WIDTH = 256;
+const int STEP_SIZE = 16;
 
 struct Detection {
     Rect roi;
     float prob;
+    string className;
 };
 
 
@@ -56,6 +57,8 @@ Detection getDetectionWithMaxOverlap(const vector<Detection>& detections, float 
 
     return bestDetection;
 }
+
+
 // === Estrai SIFT dove la maschera è positiva ===
 Mat extractSIFT(const Mat& imgGray, const Mat& mask) {
     Ptr<SIFT> sift = SIFT::create();
@@ -87,15 +90,13 @@ Mat computeHistogram(const Mat& descriptors, const Mat& vocabulary) {
 }
 
 // === Sliding Window Detection ===
-vector<Detection> slidingWindow(const Mat& img, Ptr<SVM> svm, const Mat& vocab, float threshold = 0.7) {
+vector<Detection> slidingWindow(const Mat& img, Ptr<SVM> svm, const Mat& vocab, float threshold = 0.5) {
     vector<Detection> detections;
     Ptr<SIFT> sift = SIFT::create();
-
     for (int y = 0; y <= img.rows - WIN_HEIGHT; y += STEP_SIZE) {
         for (int x = 0; x <= img.cols - WIN_WIDTH; x += STEP_SIZE) {
-            Rect roi(x, y, WIN_WIDTH, WIN_HEIGHT);
-            Mat patchGray;
-            cvtColor(img(roi), patchGray, COLOR_BGR2GRAY);
+            Rect roi(x, y, WIN_WIDTH,WIN_HEIGHT);
+            Mat patchGray = img(roi);
 
             vector<KeyPoint> kp;
             Mat desc;
@@ -107,30 +108,35 @@ vector<Detection> slidingWindow(const Mat& img, Ptr<SVM> svm, const Mat& vocab, 
             float response = svm->predict(hist, noArray(), StatModel::RAW_OUTPUT);
             float prob = 1.0f / (1.0f + exp(-response));
 
-            if (prob > threshold) {
+            if (prob > threshold) { 
                 Detection temp;
                 temp.roi = roi;
-                temp.prob = prob;
+                temp.prob = prob;         
                 detections.push_back(temp);
             }
                 
         }
     }
+    
+    
     return detections;
 }
 
+bool compareByProb(const Detection &a, const Detection &b) {
+    return a.prob > b.prob;
+}
+
 int main() {
-    string dataset_path = "models/";
+    string dataset_path = "mustard/";
 
     vector<Mat> allDescriptors;
     vector<int> labels;
 
     for (const auto& entry : fs::directory_iterator(dataset_path)) {
         string filename = entry.path().filename().string();
-
-        // qui potrei estrarre lo sofndo dai bg ma overfitta per riconoscere solo il background
-        if (filename.find("_color.png") == string::npos) continue;
-
+        if (filename.find("_color.png") == string::npos) {
+            continue;
+        }
         string base = filename.substr(0, filename.find("_color.png"));
         string colorPath = dataset_path + base + "_color.png";
         string maskPath = dataset_path + base + "_mask.png";
@@ -139,16 +145,37 @@ int main() {
         Mat mask = imread(maskPath, IMREAD_GRAYSCALE);
         Mat gray;
         cvtColor(color, gray, COLOR_BGR2GRAY);
+        Mat claheResult;
+        Ptr<CLAHE> clahe = createCLAHE();
+        clahe->setClipLimit(4.0);
+        clahe->apply(gray, claheResult);
 
-        Mat desc = extractSIFT(gray, mask);
+        Mat desc = extractSIFT(claheResult, mask);
         if (!desc.empty()) {
             allDescriptors.push_back(desc);
             labels.push_back(1);  // positivo
         }
+    }
 
-        Mat desc_bg = extractSIFT(gray, Mat()); // maschera nulla = sfondo
-        if (!desc_bg.empty()) {
-            allDescriptors.push_back(desc_bg);
+    // negative
+    for (const auto& entry : fs::directory_iterator("models/")) {
+        string filename = entry.path().filename().string();
+       
+        string colorPath = "models/" + filename;
+        if (filename.find("_color.png") == string::npos) {
+            continue;
+        }
+        Mat color = imread(colorPath);
+        Mat gray;
+        cvtColor(color, gray, COLOR_BGR2GRAY);
+        Mat claheResult;
+        Ptr<CLAHE> clahe = createCLAHE();
+        clahe->setClipLimit(4.0);
+        clahe->apply(gray, claheResult);
+
+        Mat desc = extractSIFT(claheResult, Mat());
+        if (!desc.empty()) {
+            allDescriptors.push_back(desc);
             labels.push_back(0);  // negativo
         }
     }
@@ -183,19 +210,33 @@ int main() {
     cout << "SVM addestrato!\n";
 
     // Test sulle immagini di test
-    for (const auto& entry : fs::directory_iterator("testFiles/")) {
+    for (const auto& entry : fs::directory_iterator("test_images/")) {
         Mat testImg = imread(entry.path().string());
-        vector<Detection> detections = slidingWindow(testImg, svm, vocabulary);
+        //Mat testImg = imread("testFiles/35_0054_001329-color.jpg");
+        Mat gray, claheResult;
+        cvtColor(testImg, gray, COLOR_BGR2GRAY);
+        Ptr<CLAHE> clahe = createCLAHE();
+        clahe->setClipLimit(4.0);
+        clahe->apply(gray, claheResult);
+        //Mat gray;
+        //cvtColor(testImg, gray, COLOR_BGR2GRAY);
+        vector<Detection> detections = slidingWindow(claheResult, svm, vocabulary);
         cout << detections.size() << endl;
         if(detections.size() == 0) {
             cout << "No detections sorry :(" << endl;
             continue;
         }
+        std::sort(detections.begin(), detections.end(), compareByProb);
+        // get top 10 predictions
+        vector<Detection> topDetection;
+        int maxDetection = 10;
+        if(detections.size() < maxDetection) maxDetection = detections.size();
+        for(int i = 0; i < maxDetection;i++) topDetection.push_back(detections[i]);
+        
         float iouThreshold = 0.3f;  // Soglia per determinare se due box sono considerate sovrapposte
         Detection bestDetection = getDetectionWithMaxOverlap(detections, iouThreshold);
-
-        rectangle(testImg, bestDetection.roi, Scalar(0, 255, 0), 2);
-
+        
+        rectangle(testImg, bestDetection.roi, Scalar(0, 0, 255), 2);
         imshow("Detections", testImg);
         waitKey(0);
     }
