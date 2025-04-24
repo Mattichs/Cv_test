@@ -1,4 +1,3 @@
-#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/ml.hpp>
 #include <filesystem>
 #include <iostream>
@@ -8,15 +7,12 @@
 namespace fs = std::filesystem;
 using namespace cv;
 using namespace cv::ml;
-using namespace cv::xfeatures2d;
+
 using namespace std;
 
 
 int main() {
     const int VOCAB_SIZE = 100;
-    const int WIN_HEIGHT= 256;
-    const int WIN_WIDTH = 256;
-    const int STEP_SIZE = 16;
     string datasetPath = "dataset/";
     vector<string> classFolders = {"mustard", "drill", "sugar"};
 
@@ -27,43 +23,12 @@ int main() {
         {"drill", 1},
         {"sugar", 2}
     };
+    
+    loadImagesAndGetFeatures(datasetPath, classFolders, allDescriptors, labels, classToLabel);
 
-    for(const auto& folder : classFolders) {
-        string currentFolder = datasetPath + folder + "/";
-        for(const auto& entry : fs::directory_iterator(currentFolder)) {
-            string filename = entry.path().filename().string();
-            if (filename.find("_color.png") == string::npos) {
-                continue;
-            }
-            string base = filename.substr(0, filename.find("_color.png"));
-            string colorPath = currentFolder + base + "_color.png";
-            string maskPath = currentFolder + base + "_mask.png";
+    //cout << "Descriptors size: " << allDescriptors.size() <<endl;
+    //cout << "Num labels: " << labels.size() <<endl;
 
-            Mat color = imread(colorPath);
-            if(color.empty()) {
-                cerr << "Non riesco a leggere l'immagine: " << colorPath << endl;
-                continue;
-            }
-            Mat mask = imread(maskPath, IMREAD_GRAYSCALE);
-            if(mask.empty()) {
-                cerr << "Non riesco a leggere la maschera: " << maskPath << endl;
-                continue;
-            }
-            Mat gray;
-            cvtColor(color, gray, COLOR_BGR2GRAY);
-            Mat claheResult;
-            Ptr<CLAHE> clahe = createCLAHE();
-            clahe->setClipLimit(4.0);
-            clahe->apply(gray, claheResult);
-
-            Mat desc = extractSIFT(claheResult, mask);
-            if (!desc.empty()) {
-                allDescriptors.push_back(desc);
-                labels.push_back(classToLabel[folder]);  
-            }    
-        }
-    }
-    cout << "Num labels: " << labels.size() <<endl;
     // Unisci tutti i descrittori
     Mat descriptorsAll;
     vconcat(allDescriptors, descriptorsAll);
@@ -91,29 +56,11 @@ int main() {
     }
     Mat labelsMat(labels.size(), 1, CV_32S);
     for (size_t i = 0; i < labels.size(); ++i) {
-        // Assicurati che le etichette siano interi >= 0
         labelsMat.at<int>(i, 0) = labels[i];
     }
 
-    // Controllo Dimensioni (opzionale ma utile per debug)
-    cout << "Dimensioni TrainData: " << trainData.size() << " Tipo: " << trainData.type() << endl;
-    cout << "Dimensioni LabelsMat: " << labelsMat.size() << " Tipo: " << labelsMat.type() << endl;
-
-    // Verifica che il numero di campioni corrisponda
-    if (trainData.rows != labelsMat.rows) {
-        cerr << "Errore: Il numero di campioni in trainData (" << trainData.rows
-             << ") non corrisponde al numero di etichette (" << labelsMat.rows << ")" << endl;
-        return -1; // O gestisci l'errore come preferisci
-    }
-    // Verifica che trainData sia CV_32F
-    if (trainData.type() != CV_32F) {
-        cerr << "Avviso: trainData non è di tipo CV_32F. Tentativo di conversione." << endl;
-        trainData.convertTo(trainData, CV_32F);
-        if (trainData.type() != CV_32F) {
-             cerr << "Errore: Impossibile convertire trainData a CV_32F." << endl;
-             return -1;
-        }
-    }
+    //cout << "Dimensioni TrainData: " << trainData.size() << " Tipo: " << trainData.type() << endl;
+    //cout << "Dimensioni LabelsMat: " << labelsMat.size() << " Tipo: " << labelsMat.type() << endl;
 
     // 2. Creazione e configurazione del classificatore Random Forest
     Ptr<ml::RTrees> rf = ml::RTrees::create();
@@ -144,115 +91,19 @@ int main() {
     }
 
 
-    // 4. (Opzionale ma raccomandato) Salvare il modello addestrato
+    // 4. Salvare il modello addestrato
     string modelPath = "random_forest_bow_model.yml";
     cout << "Salvataggio del modello in: " << modelPath << endl;
     rf->save(modelPath);
 
     cout << "Modello Random Forest addestrato e salvato." << endl;
 
-    std::vector<std::string> classNames = {"mustard", "drill", "sugar"}; // Stesso ordine delle etichette 0, 1, 2
 
-    // --- Parametri e Setup ---
-    for (const auto& entry : fs::directory_iterator("test_images/")) {
-        // --- Caricamento e Preprocessing Immagine di Test ---
-        Mat testColor = imread(entry.path().string());
-        if (testColor.empty()) {
-            std::cerr << "Errore: Impossibile leggere l'immagine di test: " << std::endl;
-            return -1;
-        }
+    string testPath = "test_images/";
 
-        float treshold = 0.4;
-        vector<Detection> detections = slidingWindow(testColor, rf, vocabulary, treshold, WIN_WIDTH, WIN_HEIGHT, STEP_SIZE);
-        cout << detections.size() << endl;
-        if(detections.size() == 0) {
-            cout << "No detections sorry :(" << endl;
-        }
-        //std::sort(detections.begin(), detections.end(), compareByProb);
-        
-        // split detection to mustard, drill and sugar
-        vector<Detection> mustardDetections;
-        vector<Detection> drillDetections;
-        vector<Detection> sugarDetections;
-        for(const auto & d: detections) {
-            if(d.className == "mustard") {
-                mustardDetections.push_back(d);
-            } else if(d.className == "drill") {
-                drillDetections.push_back(d);
-            } else {
-                sugarDetections.push_back(d);
-            }
-        }
-        cout << "mustard Detections:" << mustardDetections.size() << endl;
-        cout << "drill Detections:" << drillDetections.size() << endl;
-        cout << "sugar Detections:" << sugarDetections.size() << endl;
-
-        int maxDetection = 10;
-        float iouThreshold = 0.3f; 
-        // get best for mustard
-        if(!mustardDetections.empty()) {
-            if(mustardDetections.size() == 1) {
-                rectangle(testColor, mustardDetections[0].roi, Scalar(0, 0, 255), 2);
-            } else {
-                std::sort(mustardDetections.begin(), mustardDetections.end(), compareByProb);
+    // testo sulle immagini 
+    computeTestImages(testPath, rf, vocabulary);
             
-                vector<Detection> topMustardDetection;
-            
-                if(mustardDetections.size() < maxDetection) maxDetection = mustardDetections.size();
-                for(int i = 0; i < maxDetection;i++) topMustardDetection.push_back(mustardDetections[i]);
-                
-                // Soglia per determinare se due box sono considerate sovrapposte
-                Detection bestMustardDetection = getDetectionWithMaxOverlap(topMustardDetection, iouThreshold);
-                rectangle(testColor, bestMustardDetection.roi, Scalar(0, 0, 255), 2);
-       
-            }
-        }
-        
-        // get best for drill
-        if(!drillDetections.empty()) {
-            if(drillDetections.size() == 1) {
-                rectangle(testColor, drillDetections[0].roi, Scalar(255, 0, 0), 2);
-            } else {
-                std::sort(drillDetections.begin(), drillDetections.end(), compareByProb);
-        
-                vector<Detection> topDrillDetection;
-                if(drillDetections.size() < maxDetection) maxDetection = drillDetections.size();
-                for(int i = 0; i < maxDetection;i++) topDrillDetection.push_back(drillDetections[i]);
-                
-                Detection bestDrillDetection = getDetectionWithMaxOverlap(topDrillDetection, iouThreshold);
-                rectangle(testColor, bestDrillDetection.roi, Scalar(255, 0, 0), 2);
-            }
-        }
-        
-        
-        // get best from sugar
-        if(!sugarDetections.empty()) {
-            if(sugarDetections.size() == 1) {
-                rectangle(testColor, sugarDetections[0].roi, Scalar(0, 255, 0), 2);
-            } else {
-                std::sort(sugarDetections.begin(), sugarDetections.end(), compareByProb);
-                
-                vector<Detection> topSugarDetection;
-                if(sugarDetections.size() < maxDetection) maxDetection = sugarDetections.size();
-                for(int i = 0; i < maxDetection;i++) topSugarDetection.push_back(sugarDetections[i]);
-                
-                Detection bestSugarDetection = getDetectionWithMaxOverlap(topSugarDetection, iouThreshold);
-                rectangle(testColor, bestSugarDetection.roi, Scalar(0, 255, 0), 2);
-            }
-        }
-        imshow("Detections", testColor);
-        waitKey(0);
-    }
-    
-    
-
-    
-
-
-    
-    return 0;
-
-    
     return 0;
 }
  

@@ -1,17 +1,5 @@
 #include "detection.h"
-
-cv::Mat extractSIFT(const cv::Mat& image, const cv::Mat& mask) {
-    cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-    
-    if (!mask.empty()) {
-        sift->detectAndCompute(image, mask, keypoints, descriptors);
-    } else {
-        sift->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
-    }
-    return descriptors;
-}
+#include <filesystem>
 
 cv::Mat computeHistogram(const cv::Mat& descriptors, const cv::Mat& vocabulary) {
     if (descriptors.empty() || vocabulary.empty()) {
@@ -58,6 +46,7 @@ cv::Mat computeHistogram(const cv::Mat& descriptors, const cv::Mat& vocabulary) 
 
     return histogram;
 }
+
 
 std::vector<Detection> slidingWindow(const cv::Mat& img, cv::Ptr<cv::ml::RTrees> rf, const cv::Mat& vocab, float threshold, int winWidth, int winHeight, int stepSize) {
     std::vector<Detection> detections;
@@ -108,4 +97,75 @@ std::vector<Detection> slidingWindow(const cv::Mat& img, cv::Ptr<cv::ml::RTrees>
     
     
     return detections;
+}
+
+
+void getBestDetection(Detection& best, std::vector<Detection>& detections, int maxDetections, float iouThreshold) {
+     if(!detections.empty()) {
+        if(detections.size() == 1) {
+            //cv::rectangle(testColor, detections[0].roi, cv::Scalar(0, 0, 255), 2);
+            best = detections[0];
+        } else {
+            std::sort(detections.begin(), detections.end(), compareByProb);
+        
+            std::vector<Detection> topDetection;
+        
+            if(detections.size() < maxDetections) maxDetections = detections.size();
+            for(int i = 0; i < maxDetections;i++) topDetection.push_back(detections[i]);
+            
+            // Soglia per determinare se due box sono considerate sovrapposte
+            best = getDetectionWithMaxOverlap(topDetection, iouThreshold);
+            //cv::rectangle(testColor, best.roi, cv::Scalar(0, 0, 255), 2);
+        }
+    } 
+}
+
+
+void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, const cv::Mat& vocab) {
+    for (const auto& entry : std::filesystem::directory_iterator(testPath)) {
+        // --- Caricamento e Preprocessing Immagine di Test ---
+        cv::Mat testColor = cv::imread(entry.path().string());
+        if (testColor.empty()) {
+            std::cerr << "Errore: Impossibile leggere l'immagine di test: " << std::endl;
+            return;
+        }
+
+        std::vector<Detection> detections = slidingWindow(testColor, rf, vocab);
+        std::cout << detections.size() << std::endl;
+        if(detections.size() == 0) {
+            std::cout << "No detections sorry :(" << std::endl;
+        }
+        
+        // split detection to mustard, drill and sugar
+        std::vector<Detection> mustardDetections;
+        std::vector<Detection> drillDetections;
+        std::vector<Detection> sugarDetections;
+        for(const auto & d: detections) {
+            if(d.className == "mustard") {
+                mustardDetections.push_back(d);
+            } else if(d.className == "drill") {
+                drillDetections.push_back(d);
+            } else {
+                sugarDetections.push_back(d);
+            }
+        }
+        std::cout << "mustard Detections:" << mustardDetections.size() << std::endl;
+        std::cout << "drill Detections:" << drillDetections.size() << std::endl;
+        std::cout << "sugar Detections:" << sugarDetections.size() << std::endl;
+
+        Detection bestMustard;
+        getBestDetection(bestMustard, mustardDetections);
+        cv::rectangle(testColor, bestMustard.roi, cv::Scalar(0, 0, 255), 2);
+
+        Detection bestDrill;
+        getBestDetection(bestDrill, drillDetections);
+        cv::rectangle(testColor, bestDrill.roi, cv::Scalar(0, 255, 0), 2);
+
+        Detection bestSugar;
+        getBestDetection(bestSugar, sugarDetections);
+        cv::rectangle(testColor, bestSugar.roi, cv::Scalar(255, 0, 0), 2);
+
+        //TODO: chiamare funzione per stampare immagine con label  efile txt
+        
+    }
 }
