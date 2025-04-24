@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <iostream>
 #include <numeric>
+#include "detection.h"
 
 namespace fs = std::filesystem;
 using namespace cv;
@@ -11,16 +12,6 @@ using namespace cv::ml;
 using namespace cv::xfeatures2d;
 using namespace std;
 
-const int VOCAB_SIZE = 100;
-const int WIN_HEIGHT= 256;
-const int WIN_WIDTH = 256;
-const int STEP_SIZE = 16;
-
-struct Detection {
-    Rect roi;
-    float prob;
-    string className;
-};
 
 Detection getDetectionWithMaxOverlap(const vector<Detection>& detections, float iouThreshold) {
     if (detections.empty()) {
@@ -58,134 +49,15 @@ Detection getDetectionWithMaxOverlap(const vector<Detection>& detections, float 
 }
 
 
-// Funzione per estrarre descrittori SIFT (esempio basato sul tuo codice)
-cv::Mat extractSIFT(const cv::Mat& image, const cv::Mat& mask = cv::Mat()) {
-    cv::Ptr<cv::SIFT> sift = cv::SIFT::create();
-    std::vector<cv::KeyPoint> keypoints;
-    cv::Mat descriptors;
-    // Nota: La maschera qui è opzionale per l'immagine di test.
-    // Se la maschera era *essenziale* per definire l'oggetto nel training,
-    // potresti aver bisogno di un modo per generare/fornire una maschera
-    // anche per l'immagine di test, altrimenti estrai da tutta l'immagine.
-    if (!mask.empty()) {
-        sift->detectAndCompute(image, mask, keypoints, descriptors);
-    } else {
-        sift->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
-    }
-    return descriptors;
-}
-
-// Funzione per calcolare l'istogramma BoW (esempio basato sul tuo codice)
-cv::Mat computeHistogram(const cv::Mat& descriptors, const cv::Mat& vocabulary) {
-    if (descriptors.empty() || vocabulary.empty()) {
-        // Restituisci un istogramma vuoto o di zeri se non ci sono descrittori
-        // La dimensione deve corrispondere alla dimensione del vocabolario (VOCAB_SIZE)
-        int vocabSize = vocabulary.rows; // Assumendo che VOCAB_SIZE sia la dimensione delle righe
-         if (vocabSize <= 0) {
-             cerr << "Errore: Dimensione del vocabolario non valida in computeHistogram." << endl;
-             return cv::Mat(); // Restituisce Mat vuota in caso di errore grave
-         }
-        return cv::Mat::zeros(1, vocabSize, CV_32F);
-    }
-    // Assicurati che i descrittori siano CV_32F come richiesto da BFMatcher
-    cv::Mat descriptorsFloat;
-    if (descriptors.type() != CV_32F) {
-        descriptors.convertTo(descriptorsFloat, CV_32F);
-    } else {
-        descriptorsFloat = descriptors;
-    }
-
-    // Usa BFMatcher per trovare la visual word più vicina per ogni descrittore
-    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::FLANNBASED);
-    // Alternativa più semplice: cv::Ptr<cv::DescriptorMatcher> matcher = cv::BFMatcher::create();
-
-    cv::BOWImgDescriptorExtractor bowDE(matcher);
-    bowDE.setVocabulary(vocabulary);
-
-    cv::Mat histogram;
-    // Calcola l'istogramma BoW per i descrittori dell'immagine
-    // Nota: BOWImgDescriptorExtractor richiede keypoints fittizi se si usa compute(descriptors, hist)
-    // È più semplice usare l'overload che prende immagine e keypoints, ma richiede l'immagine originale.
-    // Qui usiamo direttamente i descrittori, quindi dobbiamo gestire il formato.
-    // In alternativa, puoi fare il matching manualmente e costruire l'istogramma.
-
-    // Metodo Manuale (più controllo):
-    std::vector<cv::DMatch> matches;
-    matcher->match(descriptorsFloat, vocabulary, matches); // Trova la parola del vocabolario più vicina per ogni descrittore
-
-    int vocabSize = vocabulary.rows;
-    histogram = cv::Mat::zeros(1, vocabSize, CV_32F); // Istogramma inizializzato a zero
-
-    for (const auto& match : matches) {
-        if (match.queryIdx < descriptorsFloat.rows && match.trainIdx < vocabSize) {
-            histogram.at<float>(0, match.trainIdx)++; // Incrementa il bin corrispondente alla visual word
-        }
-    }
-
-    // Normalizzazione L1 (opzionale ma comune per BoW)
-    cv::normalize(histogram, histogram, 1.0, 0.0, cv::NORM_L1);
-
-    return histogram;
-}
-
-// === Sliding Window Detection ===
-vector<Detection> slidingWindow(const Mat& img, Ptr<RTrees> rf, const Mat& vocab, float threshold = 0.4) {
-    vector<Detection> detections;
-    Ptr<SIFT> sift = SIFT::create();
-    for (int y = 0; y <= img.rows - WIN_HEIGHT; y += STEP_SIZE) {
-        for (int x = 0; x <= img.cols - WIN_WIDTH; x += STEP_SIZE) {
-            Rect roi(x, y, WIN_WIDTH,WIN_HEIGHT);
-            Mat patchColor = img(roi);
-            cv::Mat patchGray;
-            cv::cvtColor(patchColor, patchGray, cv::COLOR_BGR2GRAY);
-
-            cv::Mat patchClaheResult;
-            cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE();
-            clahe->setClipLimit(4.0); // Usa lo stesso limite del training
-            clahe->apply(patchGray, patchClaheResult);
-            
-            // estraggo descrittori SIFT
-            cv::Mat patchDescriptors = extractSIFT(patchClaheResult);
-
-            cv::Mat testHistogram = computeHistogram(patchDescriptors, vocab);
-
-            cv::Mat predictionResults;
-            rf->getVotes(testHistogram, predictionResults, 0);
-            //cout << predictionResults << endl;
-            int totalVotes;
-            std::vector<std::string> classNames = {"mustard", "drill", "sugar"};
-            std::vector<double> votesPerClass(classNames.size());
-            Mat votes = predictionResults.row(1);
-            //cout << votes << endl;
-            float sum = 0.0f;
-            for(int i = 0; i < votes.cols; i++) sum+=votes.at<int>(0,i);
-            
-            for (int i= 0; i < votes.cols; i++) {
-                float prob = votes.at<int>(0,i)/sum;
-                cout << classNames[i] << " : " << prob << endl;    
-                if(prob > threshold) {
-                    Detection temp;
-                    temp.className = classNames[i];
-                    temp.roi = roi;
-                    temp.prob = prob;
-                    detections.push_back(temp);
-                }
-            }
-        
-            /* imshow("patch", patchColor);      
-            waitKey(0);    */       
-        }
-    }
-    
-    
-    return detections;
-}
-
 bool compareByProb(const Detection &a, const Detection &b) {
     return a.prob > b.prob;
 }
 
 int main() {
+    const int VOCAB_SIZE = 100;
+    const int WIN_HEIGHT= 256;
+    const int WIN_WIDTH = 256;
+    const int STEP_SIZE = 16;
     string datasetPath = "dataset/";
     vector<string> classFolders = {"mustard", "drill", "sugar"};
 
@@ -331,8 +203,8 @@ int main() {
             return -1;
         }
 
-        
-        vector<Detection> detections = slidingWindow(testColor, rf, vocabulary);
+        float treshold = 0.4;
+        vector<Detection> detections = slidingWindow(testColor, rf, vocabulary, treshold, WIN_WIDTH, WIN_HEIGHT, STEP_SIZE);
         cout << detections.size() << endl;
         if(detections.size() == 0) {
             cout << "No detections sorry :(" << endl;
@@ -421,51 +293,7 @@ int main() {
     
     return 0;
 
-    /*
-
-    // SVM
-    Ptr<SVM> svm = SVM::create();
-    svm->setKernel(SVM::LINEAR);
-    svm->setType(SVM::C_SVC);
-    svm->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER, 1000, 1e-6));
-    svm->train(trainData, ROW_SAMPLE, labels);
-    svm->save("svm_model.yml");
-    FileStorage fs_vocab("vocab.yml", FileStorage::WRITE);
-    fs_vocab << "vocabulary" << vocabulary;
-    fs_vocab.release();
-    cout << "SVM addestrato!\n";
-
-    // Test sulle immagini di test
-    for (const auto& entry : fs::directory_iterator("testFiles/")) {
-        Mat testImg = imread(entry.path().string());
-        //Mat testImg = imread("testFiles/35_0054_001329-color.jpg");
-        Mat gray, claheResult;
-        cvtColor(testImg, gray, COLOR_BGR2GRAY);
-        Ptr<CLAHE> clahe = createCLAHE();
-        clahe->setClipLimit(4.0);
-        clahe->apply(gray, claheResult);
-        //Mat gray;
-        //cvtColor(testImg, gray, COLOR_BGR2GRAY);
-        vector<Detection> detections = slidingWindow(claheResult, svm, vocabulary);
-        cout << detections.size() << endl;
-        if(detections.size() == 0) {
-            cout << "No detections sorry :(" << endl;
-            continue;
-        }
-        std::sort(detections.begin(), detections.end(), compareByProb);
-        // get top 10 predictions
-        vector<Detection> topDetection;
-        int maxDetection = 10;
-        if(detections.size() < maxDetection) maxDetection = detections.size();
-        for(int i = 0; i < maxDetection;i++) topDetection.push_back(detections[i]);
-        
-        float iouThreshold = 0.3f;  // Soglia per determinare se due box sono considerate sovrapposte
-        Detection bestDetection = getDetectionWithMaxOverlap(detections, iouThreshold);
-        
-        rectangle(testImg, bestDetection.roi, Scalar(0, 0, 255), 2);
-        imshow("Detections", testImg);
-        waitKey(0);
-    } */
+    
     return 0;
 }
  

@@ -1,11 +1,18 @@
-#include "include/utils.h"
+#include "utils.h"
 #include <fstream>
+#include <iostream>
 
-void printCoordinates(const cv::Rect& rectangle, std::string className, const std::string& filename) {
-    cv::Point topLeft = rectangle.tl();
-    cv::Point bottomRight = rectangle.br();
-    // change name using parameter
-    std::ofstream output("output.txt");
-    output << className << " " <<  topLetf.x << " " <<  topLetf.y << " " << bottomRight.x << " " << bottomRight.y;
-    MyFile.close();
+void printCoordinates(const std::vector<Detection>& detections, std::string className, const std::string& filename) {
+    // creo il file 
+    std::ofstream output(filename);
+    for(const auto& d : detections) {
+        cv::Point topLeft = d.roi.tl();
+        cv::Point bottomRight = d.roi.br();
+        std::cout << d.className << " " << topLeft.x << " " << topLeft.y << " " << bottomRight.x << " " << bottomRight.y << std::endl;
+        // change name using parameter
+       
+        //output << className << " " <<  topLetf.x << " " <<  topLetf.y << " " << bottomRight.x << " " << bottomRight.y;
+        //MyFile.close();
+    }
+    
 }
