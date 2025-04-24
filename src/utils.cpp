@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "../include/utils.h"
 #include <fstream>
 #include <iostream>
 #include <opencv2/xfeatures2d.hpp>
@@ -99,17 +99,32 @@ bool compareByProb(const Detection &a, const Detection &b) {
     return a.prob > b.prob;
 }
 
+void clearOutputFile(const std::string& filename){
+
+}
+
 void printCoordinates(const std::vector<Detection>& detections, const std::string& filename) {
     // creo il file 
     std::ofstream output(filename);
     for(const auto& d : detections) {
         cv::Point topLeft = d.roi.tl();
         cv::Point bottomRight = d.roi.br();
-        std::cout << d.className << " " << topLeft.x << " " << topLeft.y << " " << bottomRight.x << " " << bottomRight.y << std::endl;
+        output << d.classId << "_" << d.className << " " << topLeft.x << " " << topLeft.y << " " << bottomRight.x << " " << bottomRight.y << std::endl;
         // change name using parameter
        
         //output << className << " " <<  topLetf.x << " " <<  topLetf.y << " " << bottomRight.x << " " << bottomRight.y;
         //MyFile.close();
     }
+    output.close();
     
+}
+
+void showAndSaveImageWithDetections(const cv::Mat& img, const std::vector<Detection>& detections, const std::string& filename){
+    for(const auto& d : detections) {
+        cv::rectangle(img, d.roi, d.color, 2);
+        putText(img, d.className, cv::Point(d.roi.x, d.roi.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.6, d.color, 2);
+    }
+    cv::imwrite(filename, img);
+    cv::imshow("Detections", img);
+    cv::waitKey(0);
 }

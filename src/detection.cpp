@@ -1,5 +1,6 @@
-#include "detection.h"
+#include "../include/detection.h"
 #include <filesystem>
+#include <regex>
 
 cv::Mat computeHistogram(const cv::Mat& descriptors, const cv::Mat& vocabulary) {
     if (descriptors.empty() || vocabulary.empty()) {
@@ -72,6 +73,8 @@ std::vector<Detection> slidingWindow(const cv::Mat& img, cv::Ptr<cv::ml::RTrees>
             rf->getVotes(testHistogram, predictionResults, 0);
             //cout << predictionResults << endl;
             std::vector<std::string> classNames = {"mustard", "drill", "sugar"};
+            std::vector<std::string> classIds = {"006", "035", "004"};
+            std::vector<cv::Scalar> classColors = {cv::Scalar (255,0,0), cv::Scalar (0,255,0), cv::Scalar (0,0,255)};
             std::vector<double> votesPerClass(classNames.size());
             cv::Mat votes = predictionResults.row(1);
             //cout << votes << endl;
@@ -84,8 +87,10 @@ std::vector<Detection> slidingWindow(const cv::Mat& img, cv::Ptr<cv::ml::RTrees>
                 if(prob > threshold) {
                     Detection temp;
                     temp.className = classNames[i];
+                    temp.classId = classIds[i];
                     temp.roi = roi;
                     temp.prob = prob;
+                    temp.color = classColors[i];
                     detections.push_back(temp);
                 }
             }
@@ -122,6 +127,7 @@ void getBestDetection(Detection& best, std::vector<Detection>& detections, int m
 
 
 void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, const cv::Mat& vocab) {
+    std::string resPath="../results/";
     for (const auto& entry : std::filesystem::directory_iterator(testPath)) {
         // --- Caricamento e Preprocessing Immagine di Test ---
         cv::Mat testColor = cv::imread(entry.path().string());
@@ -155,17 +161,17 @@ void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, c
 
         Detection bestMustard;
         getBestDetection(bestMustard, mustardDetections);
-        cv::rectangle(testColor, bestMustard.roi, cv::Scalar(0, 0, 255), 2);
 
         Detection bestDrill;
         getBestDetection(bestDrill, drillDetections);
-        cv::rectangle(testColor, bestDrill.roi, cv::Scalar(0, 255, 0), 2);
 
         Detection bestSugar;
         getBestDetection(bestSugar, sugarDetections);
-        cv::rectangle(testColor, bestSugar.roi, cv::Scalar(255, 0, 0), 2);
-
-        //TODO: chiamare funzione per stampare immagine con label  efile txt
-        
+        std::vector<Detection> bestDetections = {bestMustard, bestDrill, bestSugar};
+        std::regex pattern("color.jpg", std::regex_constants::icase);
+        std::string filename= resPath + "/labels/" + std::regex_replace(entry.path().filename().string(), pattern, "box.txt");
+        printCoordinates(bestDetections, filename);
+        filename= resPath + "/images/" + entry.path().filename().string();
+        showAndSaveImageWithDetections(testColor, bestDetections, filename);
     }
 }

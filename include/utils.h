@@ -1,11 +1,16 @@
+#ifndef _UTILS_
+#define _UTILS_
 #include <opencv2/core/types.hpp>
 #include <opencv2/core/mat.hpp>
+#include "opencv2/highgui.hpp"
 #include <map>
 #include <string>
 struct Detection {
     cv::Rect roi;
     float prob;
     std::string className;
+    std::string classId;
+    cv::Scalar color;
 };
 
 
@@ -23,3 +28,7 @@ Detection getDetectionWithMaxOverlap(const std::vector<Detection>& detections, f
 bool compareByProb(const Detection &a, const Detection &b);
 
 void printCoordinates(const std::vector<Detection>& detection, const std::string& filename);
+
+void showAndSaveImageWithDetections(const cv::Mat& img, const std::vector<Detection>& detections, const std::string& filename);
+
+#endif

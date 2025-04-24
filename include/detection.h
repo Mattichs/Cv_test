@@ -1,4 +1,9 @@
-#include <opencv2/opencv.hpp>
+#ifndef _DETECTION_
+#define _DETECTION_
+
+#include "opencv2/imgproc.hpp"
+#include <opencv2/ml.hpp>
+#include <opencv2/xfeatures2d.hpp>
 #include <utils.h>
 
 /**

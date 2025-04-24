@@ -2,7 +2,7 @@
 #include <filesystem>
 #include <iostream>
 #include <numeric>
-#include "detection.h"
+#include "../include/detection.h"
 
 namespace fs = std::filesystem;
 using namespace cv;
@@ -13,7 +13,7 @@ using namespace std;
 
 int main() {
     const int VOCAB_SIZE = 100;
-    string datasetPath = "dataset/";
+    string datasetPath = "../dataset/";
     vector<string> classFolders = {"mustard", "drill", "sugar"};
 
     vector<Mat> allDescriptors;
@@ -38,7 +38,7 @@ int main() {
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
     BOWKMeansTrainer bowTrainer(VOCAB_SIZE, criteria, 3, KMEANS_PP_CENTERS);
     Mat vocabulary = bowTrainer.cluster(descriptorsAll);
-    string vocabPath = "bow_vocabulary.yml";
+    string vocabPath = "../temp/bow_vocabulary.yml";
     cv::FileStorage fs_vocab(vocabPath, cv::FileStorage::WRITE);
     if (fs_vocab.isOpened()) {
         fs_vocab << "vocabulary" << vocabulary;
@@ -92,14 +92,14 @@ int main() {
 
 
     // 4. Salvare il modello addestrato
-    string modelPath = "random_forest_bow_model.yml";
+    string modelPath = "../temp/random_forest_bow_model.yml";
     cout << "Salvataggio del modello in: " << modelPath << endl;
     rf->save(modelPath);
 
     cout << "Modello Random Forest addestrato e salvato." << endl;
 
 
-    string testPath = "test_images/";
+    string testPath = "../test_images/";
 
     // testo sulle immagini 
     computeTestImages(testPath, rf, vocabulary);
