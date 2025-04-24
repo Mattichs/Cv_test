@@ -65,3 +65,5 @@ void getBestDetection(Detection& best, std::vector<Detection>& detections, int m
  * @param vocab The vocabulary (a matrix where each row represents a visual word).
  */
 void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, const cv::Mat& vocab);
+
+#endif
