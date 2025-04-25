@@ -1,8 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/mylib.dir/src/detection.cpp.o"
   "CMakeFiles/mylib.dir/src/detection.cpp.o.d"
-  "CMakeFiles/mylib.dir/src/printBoxes.cpp.o"
-  "CMakeFiles/mylib.dir/src/printBoxes.cpp.o.d"
   "CMakeFiles/mylib.dir/src/utils.cpp.o"
   "CMakeFiles/mylib.dir/src/utils.cpp.o.d"
   "libmylib.a"

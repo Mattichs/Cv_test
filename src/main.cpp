@@ -101,9 +101,18 @@ int main() {
 
     string testPath = "../test_images/";
 
-    // testo sulle immagini 
+    cout << "Anlyzing images... Wait some seconds please :)" <<endl;
+    // test on the images
     computeTestImages(testPath, rf, vocabulary);
-            
+    cout << "I'm done ;)" << endl;
+    
+ 
+    // ASSES THE PERFORMACE (probably not that good XD, we tried be kind)
+    string resultsLabels = "../results/labels/";
+
+    calcAvgIOU(resultsLabels);
+
+
     return 0;
 }
  

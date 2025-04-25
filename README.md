@@ -27,3 +27,14 @@ This project implements an object detection pipeline based on the Bag of Visual 
 - However, the **detection performance was limited**, likely due to the **small size of the test dataset** or to an our miss understanding of the methods, but we try differents methods and we decide to use this one at the end (we spend many days trying to find the best method XD).
 - Despite this, the approach was particularly interesting and educational, demonstrating how classical vision techniques can be applied in detection scenarios.
 - We developed the idea togheter, Mattia suggest to use BoVW, Federico gives te idea to use SIFT for feature extraction.
+
+## Prepare the data to be process
+Create, if not already present, a folder name "test_images " with test images inside. Then, create another folder named "ground_truth_labels", if not already present,  with inside the labels associated to the test images.
+
+## To run 
+mkdir build
+cd build
+cmake ..
+make
+./detect
+

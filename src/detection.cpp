@@ -72,7 +72,7 @@ std::vector<Detection> slidingWindow(const cv::Mat& img, cv::Ptr<cv::ml::RTrees>
             cv::Mat predictionResults;
             rf->getVotes(testHistogram, predictionResults, 0);
             //cout << predictionResults << endl;
-            std::vector<std::string> classNames = {"mustard", "drill", "sugar"};
+            std::vector<std::string> classNames = {"mustard_bottle", "power_drill", "sugar_box"};
             std::vector<std::string> classIds = {"006", "035", "004"};
             std::vector<cv::Scalar> classColors = {cv::Scalar (255,0,0), cv::Scalar (0,255,0), cv::Scalar (0,0,255)};
             std::vector<double> votesPerClass(classNames.size());
@@ -137,7 +137,7 @@ void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, c
         }
 
         std::vector<Detection> detections = slidingWindow(testColor, rf, vocab);
-        std::cout << detections.size() << std::endl;
+        //std::cout << detections.size() << std::endl;
         if(detections.size() == 0) {
             std::cout << "No detections sorry :(" << std::endl;
         }
@@ -155,10 +155,11 @@ void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, c
                 sugarDetections.push_back(d);
             }
         }
-        std::cout << "mustard Detections:" << mustardDetections.size() << std::endl;
-        std::cout << "drill Detections:" << drillDetections.size() << std::endl;
-        std::cout << "sugar Detections:" << sugarDetections.size() << std::endl;
-
+        // These are for debugs
+        //std::cout << "mustard Detections:" << mustardDetections.size() << std::endl;
+        //std::cout << "drill Detections:" << drillDetections.size() << std::endl;
+        //std::cout << "sugar Detections:" << sugarDetections.size() << std::endl;
+        
         Detection bestMustard;
         getBestDetection(bestMustard, mustardDetections);
 
@@ -167,6 +168,7 @@ void computeTestImages(const std::string testPath, cv::Ptr<cv::ml::RTrees> rf, c
 
         Detection bestSugar;
         getBestDetection(bestSugar, sugarDetections);
+
         std::vector<Detection> bestDetections = {bestMustard, bestDrill, bestSugar};
         std::regex pattern("color.jpg", std::regex_constants::icase);
         std::string filename= resPath + "/labels/" + std::regex_replace(entry.path().filename().string(), pattern, "box.txt");

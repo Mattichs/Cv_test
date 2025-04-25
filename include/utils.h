@@ -14,6 +14,12 @@ struct Detection {
 };
 
 
+struct LabeledBox {
+    std::string classId;
+    cv::Rect box;
+};
+
+
 cv::Mat extractSIFT(const cv::Mat& image, const cv::Mat& mask = cv::Mat());
 
 void loadImagesAndGetFeatures(
@@ -30,5 +36,14 @@ bool compareByProb(const Detection &a, const Detection &b);
 void printCoordinates(const std::vector<Detection>& detection, const std::string& filename);
 
 void showAndSaveImageWithDetections(const cv::Mat& img, const std::vector<Detection>& detections, const std::string& filename);
+
+float IoU(const cv::Rect& a, const cv::Rect& b);
+
+std::vector<std::string> splitString(const std::string& str);
+
+std::vector<LabeledBox> read_boxes(const std::string& path);
+
+void calcAvgIOU(const std::string& predictedLabelsPath);
+
 
 #endif

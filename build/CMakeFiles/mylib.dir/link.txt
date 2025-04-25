@@ -1,2 +1,2 @@
-/usr/bin/ar qc libmylib.a CMakeFiles/mylib.dir/src/detection.cpp.o CMakeFiles/mylib.dir/src/printBoxes.cpp.o CMakeFiles/mylib.dir/src/utils.cpp.o
+/usr/bin/ar qc libmylib.a CMakeFiles/mylib.dir/src/detection.cpp.o CMakeFiles/mylib.dir/src/utils.cpp.o
 /usr/bin/ranlib libmylib.a
