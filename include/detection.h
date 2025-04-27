@@ -1,3 +1,4 @@
+//@author cognolatto_federico
 #ifndef _DETECTION_
 #define _DETECTION_
 
