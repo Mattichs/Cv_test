@@ -125,8 +125,8 @@ void showAndSaveImageWithDetections(const cv::Mat& img, const std::vector<Detect
         putText(img, d.className, cv::Point(d.roi.x, d.roi.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.6, d.color, 2);
     }
     cv::imwrite(filename, img);
-    /*  cv::imshow("Detections", img);
-    cv::waitKey(0); */
+    cv::imshow("Detections", img);
+    cv::waitKey(0);
 }
 
 float IoU(const cv::Rect& a, const cv::Rect& b) {
