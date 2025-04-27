@@ -1,3 +1,4 @@
+//@author cognolatto_federico
 #include "../include/detection.h"
 #include <filesystem>
 #include <regex>
