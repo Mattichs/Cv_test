@@ -1,3 +1,4 @@
+//@author bastianello_mattia
 #ifndef _UTILS_
 #define _UTILS_
 #include <opencv2/core/types.hpp>
