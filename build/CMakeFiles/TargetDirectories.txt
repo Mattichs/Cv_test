@@ -1,4 +1,0 @@
-/Users/bastia/Desktop/Cv_test/build/CMakeFiles/mylib.dir
-/Users/bastia/Desktop/Cv_test/build/CMakeFiles/detect.dir
-/Users/bastia/Desktop/Cv_test/build/CMakeFiles/edit_cache.dir
-/Users/bastia/Desktop/Cv_test/build/CMakeFiles/rebuild_cache.dir
