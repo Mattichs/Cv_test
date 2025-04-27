@@ -19,14 +19,14 @@ This project implements an object detection pipeline based on the Bag of Visual 
 - Each window was processed through the same BoVW pipeline, and the classifier predicted the object presence probability.
 
 ### 5. Post-Processing: Non-Maximum Suppression (NMS)
-- **NMS** was used to refine the results by selecting the window with the highest number of overlapping predictions among those with high confidence.
+- **NMS** was used to refine the results by selecting the window with the highest number of overlapping predictions among those with high confidence. You can find the resulting images in the results folder.
 
 ## 📌 Observations
 
 - The algorithm is conceptually valid and integrates key Computer Vision techniques like feature descriptors, BoVW, classification, and NMS.
 - However, the **detection performance was limited**, likely due to the **small size of the test dataset** or to an our miss understanding of the methods, but we try differents methods and we decide to use this one at the end (we spend many days trying to find the best method XD). We asses the performace on TP and mIOU with really low results due to our rapresentation of the detected objects. We use a box with size 256x256 that is bigger than the one on the ground truth, so if we spot the right object it may be considered wrong because the dimensions of our box.
 - Despite this, the approach was particularly interesting and educational, demonstrating how classical vision techniques can be applied in detection scenarios.
-- We developed the idea togheter, Mattia suggest to use BoVW, Federico gives te idea to use SIFT for feature extraction.
+- We developed the idea togheter, Mattia suggested to use BoVW, Federico had the idea to use SIFT for feature extraction.
 
 ## Prepare the data to be process
 Create, if not already present, a folder name "test_images " with test images inside. Then, create another folder named "ground_truth_labels", if not already present,  with inside the labels associated to the test images.
