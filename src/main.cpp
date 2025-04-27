@@ -23,17 +23,9 @@ int main() {
         {"drill", 1},
         {"sugar", 2}
     };
-    
     loadImagesAndGetFeatures(datasetPath, classFolders, allDescriptors, labels, classToLabel);
-
-    //cout << "Descriptors size: " << allDescriptors.size() <<endl;
-    //cout << "Num labels: " << labels.size() <<endl;
-
-    // Unisci tutti i descrittori
     Mat descriptorsAll;
     vconcat(allDescriptors, descriptorsAll);
-
-    // KMeans
     cout << "KMeans clustering...\n";
     TermCriteria criteria(TermCriteria::EPS + TermCriteria::MAX_ITER, 100, 0.01);
     BOWKMeansTrainer bowTrainer(VOCAB_SIZE, criteria, 3, KMEANS_PP_CENTERS);
@@ -43,12 +35,10 @@ int main() {
     if (fs_vocab.isOpened()) {
         fs_vocab << "vocabulary" << vocabulary;
         fs_vocab.release();
-        cout << "Vocabolario salvato in: " << vocabPath << endl;
+        cout << "Vocabolary path: " << vocabPath << endl;
     } else {
-        cerr << "Errore: Impossibile aprire il file per salvare il vocabolario: " << vocabPath << endl;
+        cerr << "Error: Cannot save vocabolary at: " << vocabPath << endl;
     }
-
-    // Histograms
     Mat trainData;
     for (const auto& desc : allDescriptors) {
         Mat hist = computeHistogram(desc, vocabulary);
@@ -58,13 +48,7 @@ int main() {
     for (size_t i = 0; i < labels.size(); ++i) {
         labelsMat.at<int>(i, 0) = labels[i];
     }
-
-    //cout << "Dimensioni TrainData: " << trainData.size() << " Tipo: " << trainData.type() << endl;
-    //cout << "Dimensioni LabelsMat: " << labelsMat.size() << " Tipo: " << labelsMat.type() << endl;
-
-    // Random Forest setup
     Ptr<ml::RTrees> rf = ml::RTrees::create();
-
     rf->setMaxDepth(1000);          
     rf->setMinSampleCount(5);    
     rf->setRegressionAccuracy(0); 
@@ -75,40 +59,27 @@ int main() {
     rf->setCalculateVarImportance(true); 
     rf->setActiveVarCount(0);    
     rf->setTermCriteria(TermCriteria(TermCriteria::MAX_ITER + TermCriteria::EPS, 1000, 0.01));    
-
-    // Train the model
-    cout << "Addestramento Random Forest..." << endl;
+    cout << "Training in progress..." << endl;
     try {
         rf->train(trainData, ml::ROW_SAMPLE, labelsMat);
-         cout << "Addestramento completato." << endl;
+         cout << "Training completed." << endl;
     } catch (const cv::Exception& e) {
-        cerr << "Errore durante l'addestramento della Random Forest: " << e.what() << endl;
+        cerr << "Error occured during training: " << e.what() << endl;
         return -1; 
     }
-
-
     // Save model
     string modelPath = "../temp/random_forest_bow_model.yml";
-    cout << "Salvataggio del modello in: " << modelPath << endl;
+    cout << "Saving model at: " << modelPath << endl;
     rf->save(modelPath);
-
-    cout << "Modello Random Forest addestrato e salvato." << endl;
-
-
+    cout << "Model saved." << endl;
     string testPath = "../test_images/";
-
     cout << "Anlyzing images... Wait some seconds please :)" <<endl;
     // test on the images
     computeTestImages(testPath, rf, vocabulary);
     cout << "I'm done ;)" << endl;
-    
- 
     // ASSES THE PERFORMACE (probably not that good XD, we tried be kind)
     string resultsLabels = "../results/labels/";
-
     calcAvgIOU(resultsLabels);
-
-
     return 0;
 }
  
