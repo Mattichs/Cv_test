@@ -65,48 +65,32 @@ Detection getDetectionWithMaxOverlap(const std::vector<Detection>& detections, f
     if (detections.empty()) {
         throw std::invalid_argument("No detections to process");
     }
-
-    int maxOverlapCount = 0;    // Numero di sovrapposizioni più alto trovato
-    Detection bestDetection;    // La detection con il massimo numero di sovrapposizioni
-
+    int maxOverlapCount = 0;    
+    Detection bestDetection;    
     for (size_t i = 0; i < detections.size(); ++i) {
         const Detection& current = detections[i];
         int overlapCount = 0;
-
-        // Controlla quante altre detections si sovrappongono con questa
         for (size_t j = 0; j < detections.size(); ++j) {
-            if (i == j) continue;  // Non confrontare la detection con sé stessa
-
+            if (i == j) continue;
             const Detection& other = detections[j];
-            float iou = (current.roi & other.roi).area() /
-                        float((current.roi | other.roi).area());
-
+            float iou = (current.roi & other.roi).area() float((current.roi | other.roi).area());
             if (iou > iouThreshold) {
                 overlapCount++;
             }
         }
-
-        // Se questa detection ha più sovrapposizioni di altre, aggiornala come la migliore
         if (overlapCount > maxOverlapCount) {
             maxOverlapCount = overlapCount;
             bestDetection = current;
         }
     }
-
     return bestDetection;
 }
-
 
 bool compareByProb(const Detection &a, const Detection &b) {
     return a.prob > b.prob;
 }
 
-void clearOutputFile(const std::string& filename){
-
-}
-
 void printCoordinates(const std::vector<Detection>& detections, const std::string& filename) {
-    // creo il file 
     std::ofstream output(filename);
     for(const auto& d : detections) {
         if(!d.roi.empty()) {
@@ -155,9 +139,7 @@ std::vector<LabeledBox> read_boxes(const std::string& path) {
     std::string line;
     std::vector<std::string> words;
     while (getline (file, line)) {
-        //std::cout << line << std::endl;
         words = splitString(line);
-        //std::cout << words[0] << std::endl;
         boxes.push_back({words[0], cv::Rect(cv::Point(std::stoi(words[1]), std::stoi(words[2])), cv::Point(std::stoi(words[3]), std::stoi(words[4])))});
     }
     return boxes;
@@ -180,7 +162,6 @@ void calcAvgIOU(const std::string& predictedLabelsPath) {
         std::string filename = entry.path().filename();
         std::string gt_path = trueLabelPath + filename;
         std::string pred_path = predictedLabelsPath + filename;
-        
         // just for debug
         if (!std::filesystem::exists(pred_path)) {
             std::cerr << "Error: Predicted file not found: " << pred_path << std::endl;
@@ -190,16 +171,8 @@ void calcAvgIOU(const std::string& predictedLabelsPath) {
             std::cerr << "Error: Ground truth file not found: " << gt_path << std::endl;
             break;
         }
-
-       /*  std::cout << pred_path << std::endl;
-        std::cout << gt_path << std::endl; */
-        
         std::vector<LabeledBox> predBoxes = read_boxes(pred_path);
         std::vector<LabeledBox> truthBoxes = read_boxes(gt_path);
-        
-        /* std::cout << predBoxes.size() << std::endl;
-        std::cout << truthBoxes.size() << std::endl;
-         */
         for(const auto & gt : truthBoxes) {
             std::cout << gt.classId << std::endl;
             for(const auto& pred : predBoxes) {
@@ -218,8 +191,6 @@ void calcAvgIOU(const std::string& predictedLabelsPath) {
     for (const auto& [classId, tp] : tpClasses) {
         std::cout << "TP " << classId << ": " << tp << std::endl;
     }
-    
-
     for (const auto& [classId, totalIoU] : iouPerClass) {
         float miou = totalIoU / matchesPerClass[classId];
         std::cout << "mIOU " << classId << ": " << miou << std::endl;
