@@ -12,6 +12,7 @@ using namespace std;
 
 
 int main() {
+    fs::create_directories("../temp");
     const int VOCAB_SIZE = 100;
     string datasetPath = "../dataset/";
     vector<string> classFolders = {"mustard", "drill", "sugar"};
